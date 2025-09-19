@@ -1,22 +1,28 @@
 import { GoogleGenAI, Chat } from "@google/genai";
 
-// ====================================================================
-// 重要: "YOUR_API_KEY_HERE" をあなたの実際のGemini APIキーに置き換えてください。
-// https://aistudio.google.com/app/apikey から取得できます。
-// ====================================================================
-const apiKey = "YOUR_API_KEY_HERE";
+// The API key is sourced from the environment variable `process.env.API_KEY`.
+// This is a hard requirement. The app assumes this is pre-configured.
 
+// Singleton instance of the GoogleGenAI client.
+let ai: GoogleGenAI;
 
-if (apiKey === "YOUR_API_KEY_HERE") {
-  // このエラーは、APIキーが設定されていないことを示します。
-  // アプリケーションを動作させるには、上記のapiKey変数を設定してください。
-  throw new Error("APIキーが設定されていません。services/geminiService.tsファイルで 'YOUR_API_KEY_HERE' を実際のAPIキーに置き換えてください。");
+/**
+ * Initializes and returns the GoogleGenAI client instance,
+ * ensuring it's a singleton.
+ * Throws an error if the API key is not properly configured in the environment.
+ */
+function getAiClient(): GoogleGenAI {
+  if (!ai) {
+    // The apiKey is provided by the environment.
+    // The app will fail to initialize if `process.env.API_KEY` is not set.
+    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  }
+  return ai;
 }
 
-const ai = new GoogleGenAI({ apiKey });
-
 export function createChatSession(): Chat {
-  const chat = ai.chats.create({
+  const client = getAiClient();
+  const chat = client.chats.create({
     model: 'gemini-2.5-flash',
     config: {
         systemInstruction: 'You are a helpful and friendly AI assistant named Gemini. Format your responses using markdown where appropriate for readability.'
