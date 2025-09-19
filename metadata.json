@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Chat",
+  "description": "A responsive and visually appealing web application that allows users to have a real-time, streaming conversation with Google's Gemini API. Designed to be easily embeddable in platforms like Google Sites.",
+  "requestFramePermissions": []
+}
