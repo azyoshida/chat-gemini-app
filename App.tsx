@@ -72,9 +72,13 @@ function App() {
     ]);
     
     try {
-      // Call the new non-streaming sendMessage method
+      // The sendMessage method from our service now returns a string directly.
       const geminiResponseText = await chat.sendMessage(userInput);
       
+      if (typeof geminiResponseText !== 'string' || !geminiResponseText) {
+        throw new Error("Received an invalid or empty response from the model.");
+      }
+
       // Update the placeholder with the final response
       setMessages(prev =>
         prev.map(msg =>
