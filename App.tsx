@@ -12,22 +12,33 @@ const INITIAL_MESSAGE: Message = {
     text: "Hello! I'm Gemini. How can I help you today?",
 };
 
+const AVAILABLE_MODELS = [
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+];
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [chat, setChat] = useState<Chat | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>(AVAILABLE_MODELS[0].id);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
-      const chatSession = createChatSession();
+      setIsLoading(true);
+      setError(null);
+      setMessages([INITIAL_MESSAGE]);
+      const chatSession = createChatSession(selectedModel);
       setChat(chatSession);
     } catch (e: any) {
       setError(e.message || "Failed to initialize Gemini Chat. Please check your API key.");
       console.error(e);
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [selectedModel]);
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -89,7 +100,7 @@ function App() {
         setIsLoading(true);
         setError(null);
         setMessages([INITIAL_MESSAGE]);
-        const newChatSession = createChatSession();
+        const newChatSession = createChatSession(selectedModel);
         setChat(newChatSession);
       } catch (e: any) {
         setError(e.message || "Failed to restart chat session.");
@@ -97,6 +108,21 @@ function App() {
       } finally {
         setIsLoading(false);
       }
+    }
+  };
+
+  const handleModelChange = (newModelId: string) => {
+    if (isLoading || newModelId === selectedModel) return;
+
+    if (messages.length > 1) {
+      const userConfirmed = window.confirm(
+        "Changing the model will clear the current chat history. Do you want to continue?"
+      );
+      if (userConfirmed) {
+        setSelectedModel(newModelId);
+      }
+    } else {
+      setSelectedModel(newModelId);
     }
   };
 
@@ -108,15 +134,38 @@ function App() {
             <GeminiIcon className="w-8 h-8 text-violet-400" />
             <h1 className="text-xl font-bold text-slate-100">Gemini Chat</h1>
           </div>
-          <button
-            onClick={handleClearChat}
-            className="flex items-center space-x-2 px-3 py-2 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-300 hover:text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-            aria-label="Clear chat history"
-            disabled={isLoading || messages.length <= 1}
-          >
-            <ClearIcon className="w-4 h-4" />
-            <span>Clear Chat</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            <div className="relative">
+              <select
+                id="model-selector"
+                value={selectedModel}
+                onChange={(e) => handleModelChange(e.target.value)}
+                disabled={isLoading}
+                className="appearance-none w-full bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-300 hover:text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                aria-label="Select a Gemini model"
+              >
+                {AVAILABLE_MODELS.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                  <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                </svg>
+              </div>
+            </div>
+            <button
+              onClick={handleClearChat}
+              className="flex items-center space-x-2 px-3 py-2 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-300 hover:text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+              aria-label="Clear chat history"
+              disabled={isLoading || messages.length <= 1}
+            >
+              <ClearIcon className="w-4 h-4" />
+              <span>Clear Chat</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -132,9 +181,6 @@ function App() {
         <div className="max-w-4xl mx-auto">
           {error && <p className="text-red-400 text-sm mb-2 text-center">{error}</p>}
           <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
-          <p className="text-xs text-slate-500 mt-2 text-center">
-            This is a web application for demonstration purposes. Your conversations may be reviewed.
-          </p>
         </div>
       </footer>
     </div>

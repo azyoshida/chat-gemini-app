@@ -41,7 +41,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type your message here..."
-          rows={1}
+          rows={2}
           className="w-full bg-slate-700 text-slate-100 placeholder-slate-400 border border-slate-600 rounded-lg py-2 pl-4 pr-12 resize-none focus:ring-2 focus:ring-violet-500 focus:outline-none transition duration-200 max-h-48"
           disabled={isLoading}
         />

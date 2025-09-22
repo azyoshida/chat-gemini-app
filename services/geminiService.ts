@@ -20,10 +20,10 @@ function getAiClient(): GoogleGenAI {
   return ai;
 }
 
-export function createChatSession(): Chat {
+export function createChatSession(model: string): Chat {
   const client = getAiClient();
   const chat = client.chats.create({
-    model: 'gemini-2.5-flash',
+    model: model,
     config: {
         systemInstruction: 'You are a helpful and friendly AI assistant named Gemini. Format your responses using markdown where appropriate for readability.'
     }
