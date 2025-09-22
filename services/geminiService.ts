@@ -20,29 +20,44 @@
 //    - For "Value", paste your Gemini API key.
 //    - Click "Save script properties".
 //
-// 4. **Paste the Proxy Code:**
+// 4. **Paste the NEW Proxy Code:**
 //    - Go back to the "Editor" (code icon).
 //    - Delete any existing code in the `Code.gs` file.
 //    - Copy and paste the entire `doPost` function from the block below into `Code.gs`.
 /*
 function doPost(e) {
   const API_KEY = PropertiesService.getScriptProperties().getProperty('API_KEY');
-  const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
 
   try {
     const requestBody = JSON.parse(e.postData.contents);
     
+    // Read the model from the request, default to 'gemini-2.5-flash' if not provided.
+    // This allows the client to choose the model.
+    const model = requestBody.model || 'gemini-2.5-flash';
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
+
+    // Prepare the payload for the Gemini API, which only needs the 'contents' part.
+    const geminiPayload = {
+      contents: requestBody.contents
+    };
+
     const geminiRequestOptions = {
       method: 'post',
       contentType: 'application/json',
-      payload: JSON.stringify(requestBody)
+      payload: JSON.stringify(geminiPayload)
     };
 
     const response = UrlFetchApp.fetch(API_URL, geminiRequestOptions);
     const responseBody = JSON.parse(response.getContentText());
 
+    // Check for errors in the Gemini response itself
+    if (responseBody.error) {
+      throw new Error(responseBody.error.message);
+    }
+
     // Extract the text from Gemini's response
-    const geminiText = responseBody.candidates[0].content.parts[0].text;
+    // Added safety check for valid response structure
+    const geminiText = responseBody.candidates[0]?.content?.parts[0]?.text || "I'm sorry, I couldn't generate a response.";
 
     const output = JSON.stringify({ text: geminiText });
 
@@ -52,7 +67,7 @@ function doPost(e) {
     const errorResponse = JSON.stringify({ 
       error: { 
         message: error.message,
-        details: error.stack
+        details: `Error at: ${error.stack}` // More detailed error for debugging
       } 
     });
     return ContentService.createTextOutput(errorResponse)
@@ -78,7 +93,9 @@ function doPost(e) {
 //    - Paste the copied Web app URL into the `GAS_PROXY_URL` constant below.
 // --------------------------------------------------------------------------
 
-const GAS_PROXY_URL = 'https://script.google.com/macros/s/AKfycbwD9oFg6W8u6RQ1Wpes9chs0MyUMNK593hHNDKgstfhYsXDicMzTtm82P9RMNvftra7/exec';
+// FIX: Explicitly type GAS_PROXY_URL as string to prevent a TypeScript error
+// when comparing it to a literal string in the createChatSession function.
+const GAS_PROXY_URL: string = 'https://script.google.com/macros/s/AKfycbyL5-1vT0xnX2No3wX-z2e-dZ2VBXRJrHfUJWuNewhf3zCnUiU38KVsxNNIAtXOC8B6/exec';
 
 // Type definition for the content structure expected by the Gemini API via our proxy.
 interface GeminiContent {
@@ -106,7 +123,7 @@ export function createChatSession(model: string): ClientChatSession {
   }
 
   const session: ClientChatSession = {
-    model: model, // Note: The provided GAS script uses 'gemini-pro'. Modify if needed.
+    model: model,
     history: [],
 
     async sendMessage(message: string): Promise<string> {
@@ -121,7 +138,8 @@ export function createChatSession(model: string): ClientChatSession {
           'Content-Type': 'text/plain;charset=utf-8',
         },
         body: JSON.stringify({
-          // The GAS proxy expects the contents in this specific format
+          // Pass the model ID along with the history (contents)
+          model: this.model,
           contents: currentHistory,
         }),
       });
