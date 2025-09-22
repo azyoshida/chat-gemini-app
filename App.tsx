@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { Chat } from '@google/genai';
 import { ChatInput } from './components/ChatInput';
 import { ChatMessage } from './components/ChatMessage';
-import { createChatSession } from './services/geminiService';
+import { createChatSession, type ClientChatSession } from './services/geminiService';
 import { Sender, type Message } from './types';
 import { GeminiIcon, ClearIcon } from './components/Icons';
 
@@ -14,14 +13,16 @@ const INITIAL_MESSAGE: Message = {
 
 const AVAILABLE_MODELS = [
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+  // Note: 'gemini-1.5-pro' might have different availability or pricing.
+  // Using 'gemini-2.5-flash' is recommended for general use cases.
+  // { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' }, 
 ];
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [chat, setChat] = useState<Chat | null>(null);
+  const [chat, setChat] = useState<ClientChatSession | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>(AVAILABLE_MODELS[0].id);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +34,7 @@ function App() {
       const chatSession = createChatSession(selectedModel);
       setChat(chatSession);
     } catch (e: any) {
-      setError(e.message || "Failed to initialize Gemini Chat. Please check your API key.");
+      setError(e.message || "Failed to initialize Gemini Chat. Please check your configuration.");
       console.error(e);
     } finally {
       setIsLoading(false);
@@ -48,7 +49,7 @@ function App() {
 
   const handleSendMessage = async (userInput: string) => {
     if (!chat) {
-      setError("Chat session is not initialized. Please check your API key and refresh.");
+      setError("Chat session is not initialized. Please refresh the page.");
       return;
     }
     if (isLoading || !userInput.trim()) return;
@@ -61,32 +62,30 @@ function App() {
       sender: Sender.USER,
       text: userInput,
     };
-
-    const geminiMessageId = crypto.randomUUID();
-    const geminiMessagePlaceholder: Message = {
-        id: geminiMessageId,
-        sender: Sender.GEMINI,
-        text: '',
-    };
     
-    setMessages(prev => [...prev, userMessage, geminiMessagePlaceholder]);
+    // Add user message and a temporary loading message for Gemini
+    const geminiMessageId = crypto.randomUUID();
+    setMessages(prev => [
+        ...prev, 
+        userMessage, 
+        { id: geminiMessageId, sender: Sender.GEMINI, text: '' }
+    ]);
     
     try {
-      const stream = await chat.sendMessageStream({ message: userInput });
+      // Call the new non-streaming sendMessage method
+      const geminiResponseText = await chat.sendMessage(userInput);
+      
+      // Update the placeholder with the final response
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === geminiMessageId ? { ...msg, text: geminiResponseText } : msg
+        )
+      );
 
-      let accumulatedText = '';
-      for await (const chunk of stream) {
-        const chunkText = chunk.text;
-        accumulatedText += chunkText;
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === geminiMessageId ? { ...msg, text: accumulatedText } : msg
-          )
-        );
-      }
     } catch (e: any) {
       const errorMessage = e.message || "An error occurred while fetching the response.";
       setError(errorMessage);
+      // Remove the user message and the Gemini placeholder on error
       setMessages(prev => prev.filter(msg => msg.id !== geminiMessageId && msg.id !== userMessage.id)); 
       console.error(e);
     } finally {
@@ -100,6 +99,7 @@ function App() {
         setIsLoading(true);
         setError(null);
         setMessages([INITIAL_MESSAGE]);
+        // Re-create the chat session to clear its history on the client
         const newChatSession = createChatSession(selectedModel);
         setChat(newChatSession);
       } catch (e: any) {
